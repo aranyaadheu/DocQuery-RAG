@@ -8,6 +8,9 @@ from chromadb.utils import embedding_functions
 load_dotenv()
 
 openai_key = os.getenv("OPENAI_API_KEY")
+if not openai_key:
+    raise ValueError("OPENAI_API_KEY is not set. Check your .env file.")
+
 
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
     api_key=openai_key, model_name="text-embedding-3-small"
