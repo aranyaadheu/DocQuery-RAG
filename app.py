@@ -1,39 +1,40 @@
 import os
 from dotenv import load_dotenv
 import chromadb
-from openai import OpenAI
 from chromadb.utils import embedding_functions
+from sentence_transformers import SentenceTransformer
+from transformers import pipeline
 
 # Load environment variables from .env file
 load_dotenv()
 
-openai_key = os.getenv("OPENAI_API_KEY")
-if not openai_key:
-    raise ValueError("OPENAI_API_KEY is not set. Check your .env file.")
+# Using Hugging Face's sentence-transformers model for embeddings
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
-
-openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-    api_key=openai_key, model_name="text-embedding-3-small"
-)
+def get_embedding(texts):
+    if isinstance(texts, str):  # Ensure input is a list
+        texts = [texts]
+    return embedding_model.encode(texts).tolist()
 
 
 chroma_client = chromadb.PersistentClient(path="chroma_persistent_storage")
 collection_name = "document_qa_collection"
 collection = chroma_client.get_or_create_collection(
-    name=collection_name, embedding_function=openai_ef
+    name=collection_name,
+    embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction("all-MiniLM-L6-v2")
 )
 
-
-client = OpenAI(api_key=openai_key)
-
-resp = client.chat.completions.create(
-    model = "gpt-3.5-turbo",
-    messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", 
-         "content": "What is human life expectancy in the United States?"
-        },
-    ],
+# Using Hugging Face LLM
+chat_pipeline = pipeline(
+    "text-genaration",
+    model="mistralai/Mistral-7B-Instruct-v0.1", device="cpu"
 )
 
-print(resp.choices[0].message["content"])
+def chat_with_model(prompt):
+    response = chat_pipeline(prompt, max_length=200, do_sample=True)
+    return response[0]['generated_text']
+
+user_prompt = "What is human life expectancy in the US?"
+response = chat_with_model(user_prompt)
+
+print(response)
