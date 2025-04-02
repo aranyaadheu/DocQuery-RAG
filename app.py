@@ -52,9 +52,8 @@ for doc in documents:
 # Function to generate embeddings using Ollama (without using embedding_functions.OllamaEmbeddingFunction)
 def get_ollama_embedding(text):
     print("==== Generating embeddings... ====")
-    response = ollama.chat(model="gemma:2b", messages=[{"role": "user", "content": text}])
-    embedding = response["message"]["content"]  # This should be an embedding
-    return embedding
+    response = ollama.embeddings(model="gemma:2b", prompt=text)   
+    return response["embedding"]
 
 # Generate embeddings for the document chunks
 for doc in chunked_documents:
