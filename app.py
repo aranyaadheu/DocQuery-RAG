@@ -1,40 +1,101 @@
 import os
 from dotenv import load_dotenv
 import chromadb
+import ollama
 from chromadb.utils import embedding_functions
-from sentence_transformers import SentenceTransformer
-from transformers import pipeline
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Using Hugging Face's sentence-transformers model for embeddings
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-
-def get_embedding(texts):
-    if isinstance(texts, str):  # Ensure input is a list
-        texts = [texts]
-    return embedding_model.encode(texts).tolist()
-
-
+# Initialize the Chroma client with persistence
 chroma_client = chromadb.PersistentClient(path="chroma_persistent_storage")
 collection_name = "document_qa_collection"
 collection = chroma_client.get_or_create_collection(
-    name=collection_name,
-    embedding_function=embedding_functions.SentenceTransformerEmbeddingFunction("all-MiniLM-L6-v2")
+    name=collection_name
 )
 
-# Using Hugging Face LLM
-chat_pipeline = pipeline(
-    "text-genaration",
-    model="mistralai/Mistral-7B-Instruct-v0.1", device="cpu"
-)
+# Function to load documents from a directory
+def load_documents_from_directory(directory_path):
+    print("==== Loading documents from directory ====")
+    documents = []
+    for filename in os.listdir(directory_path):
+        if filename.endswith(".txt"):
+            with open(
+                os.path.join(directory_path, filename), "r", encoding="utf-8"
+            ) as file:
+                documents.append({"id": filename, "text": file.read()})
+    return documents
 
-def chat_with_model(prompt):
-    response = chat_pipeline(prompt, max_length=200, do_sample=True)
-    return response[0]['generated_text']
+# Function to split text into chunks
+def split_text(text, chunk_size=1000, chunk_overlap=20):
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunks.append(text[start:end])
+        start = end - chunk_overlap
+    return chunks
 
-user_prompt = "What is human life expectancy in the US?"
-response = chat_with_model(user_prompt)
+# Load documents from the directory
+directory_path = "./news_articles"
+documents = load_documents_from_directory(directory_path)
 
-print(response)
+print(f"Loaded {len(documents)} documents")
+# Split documents into chunks
+chunked_documents = []
+for doc in documents:
+    chunks = split_text(doc["text"])
+    print("==== Splitting docs into chunks ====")
+    for i, chunk in enumerate(chunks):
+        chunked_documents.append({"id": f"{doc['id']}_chunk{i+1}", "text": chunk})
+
+# Function to generate embeddings using Ollama (without using embedding_functions.OllamaEmbeddingFunction)
+def get_ollama_embedding(text):
+    print("==== Generating embeddings... ====")
+    response = ollama.chat(model="gemma:2b", messages=[{"role": "user", "content": text}])
+    embedding = response["message"]["content"]  # This should be an embedding
+    return embedding
+
+# Generate embeddings for the document chunks
+for doc in chunked_documents:
+    print("==== Generating embeddings... ====")
+    doc["embedding"] = get_ollama_embedding(doc["text"])
+
+# Upsert documents with embeddings into Chroma
+for doc in chunked_documents:
+    print("==== Inserting chunks into db;;; ====")
+    collection.upsert(
+        ids=[doc["id"]], documents=[doc["text"]], embeddings=[doc["embedding"]]
+    )
+
+# Function to query documents
+def query_documents(question, n_results=2):
+    # Generate the embedding for the query using Ollama
+    query_embedding = get_ollama_embedding(question)
+    results = collection.query(query_embeddings=[query_embedding], n_results=n_results)
+
+    # Extract the relevant chunks
+    relevant_chunks = [doc for sublist in results["documents"] for doc in sublist]
+    print("==== Returning relevant chunks ====")
+    return relevant_chunks
+
+# Function to generate a response from Ollama
+def generate_response(question, relevant_chunks):
+    context = "\n\n".join(relevant_chunks)
+    prompt = (
+        "You are an assistant for question-answering tasks. Use the following pieces of "
+        "retrieved context to answer the question. If you don't know the answer, say that you "
+        "don't know. Use three sentences maximum and keep the answer concise."
+        "\n\nContext:\n" + context + "\n\nQuestion:\n" + question
+    )
+
+    response = ollama.chat(model="gemma:2b", messages=[{"role": "system", "content": prompt}, {"role": "user", "content": question}])
+    answer = response["message"]["content"]
+    return answer
+
+# Example query and response generation
+question = "What are the benefits of using Ollama for embeddings?"
+relevant_chunks = query_documents(question)
+answer = generate_response(question, relevant_chunks)
+
+print(answer)
