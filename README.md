@@ -1,14 +1,14 @@
 # RAG-Based Data Retrieval with Ollama
 
-This project demonstrates a **Retrieval-Augmented Generation (RAG)** system using the **Ollama** model for document-based question answering. The goal of the project is to integrate documents, retrieve relevant information, and generate concise answers using the Ollama LLM.
+This project demonstrates a **Retrieval-Augmented Generation (RAG)** system using the **Ollama** model for document-based question answering. The goal of the project is to integrate documents, retrieve relevant information, and generate concise answers using the **Ollama Gemma 2B** model.
 
 ## Features
 
-- Loads and processes news articles from a directory.
-- Splits documents into manageable chunks.
-- Uses **Chroma** for vector storage and retrieval.
-- Generates embeddings for documents using the **Ollama** model.
-- Queries the document database and generates responses using the **Ollama** LLM.
+- Loads and processes news articles from a specified directory (`news_articles`).
+- Splits documents into manageable chunks for efficient retrieval.
+- Uses **ChromaDB** for vector storage and retrieval of document embeddings.
+- Generates embeddings for documents using the **Ollama Gemma 2B** model.
+- Queries the document database and generates answers using **Ollama's** conversational model.
 
 ## Setup
 
@@ -44,26 +44,37 @@ This project demonstrates a **Retrieval-Augmented Generation (RAG)** system usin
     pip install -r requirements.txt
     ```
 
-5. Set up your **Ollama** API key in a `.env` file:
+5. Set up environment variables by creating a `.env` file in the root directory:
 
     ```bash
-    OLLAMA_API_KEY=your_ollama_api_key
+    CHROMA_PERSISTENT_STORAGE_PATH="chroma_persistent_storage"
     ```
+
+6. Make sure you have access to **Ollama** for the embeddings and model queries.
 
 ## Usage
 
-1. Prepare a folder `news_articles/` containing `.txt` files of articles.
+1. Prepare a folder `news_articles/` containing `.txt` files of articles you wish to process.
 2. Run the application:
 
     ```bash
     python app.py
     ```
 
-3. Query the system by providing a question, and the system will fetch relevant documents and generate a response.
+3. Query the system by providing a question. The system will fetch relevant document chunks, generate embeddings, and generate a response based on the retrieved context.
+
+## Code Explanation
+
+1. **Loading Documents**: The `load_documents_from_directory` function loads all `.txt` files from a specified directory and stores their content as documents.
+2. **Text Chunking**: The `split_text` function splits long documents into smaller, manageable chunks to allow for more accurate retrieval.
+3. **Embedding Generation**: The `get_ollama_embedding` function generates embeddings for document chunks using the **Gemma 2B** model from **Ollama**.
+4. **Storage in ChromaDB**: The embeddings are stored in **ChromaDB** for fast retrieval during queries.
+5. **Query Processing**: The `query_documents` function generates an embedding for the user’s query and retrieves the most relevant document chunks. The system uses the retrieved chunks to generate an answer.
+6. **Answer Generation**: The `generate_response` function combines the relevant context and generates concise answers using **Ollama's conversational model**.
 
 ## Example Query
 
-To query the system:
+You can use this example to query the system:
 
 ```python
 question = "What is human life expectancy in the US and Bangladesh?"

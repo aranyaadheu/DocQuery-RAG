@@ -93,7 +93,7 @@ def generate_response(question, relevant_chunks):
     return answer
 
 # Example query and response generation
-question = "What are the benefits of using Ollama for embeddings?"
+question = "tell me about databricks?"
 relevant_chunks = query_documents(question)
 answer = generate_response(question, relevant_chunks)
 
